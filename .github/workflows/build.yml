@@ -20,11 +20,11 @@ jobs:
     steps:
       - name: Clone repository
         uses: actions/checkout@v4
-
-      # ✅ THÊM: Decode keystore
-- name: Decode Keystore
-  run: |
-    echo "${{ secrets.KEYSTORE }}" | base64 -d > app/keystore.jks
+        
+# ✅ THÊM: Decode keystore
+      - name: Decode Keystore
+        run: |
+          echo "${{ secrets.KEYSTORE }}" | base64 -d > app/keystore.jks
 
       - name: Build APKs
         shell: bash {0}
