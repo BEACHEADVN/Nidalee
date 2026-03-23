@@ -65,6 +65,7 @@ jobs:
           export TERMUX_APP_VERSION_NAME="${RELEASE_VERSION_NAME/v/}"
           export TERMUX_APK_VERSION_TAG="$APK_VERSION_TAG"
           export TERMUX_PACKAGE_VARIANT="${{ env.PACKAGE_VARIANT }}"
+          export splitAPKsForReleaseBuilds=1
 
           # ✅ ĐỔI: build release để dùng keystore
           if ! ./gradlew assembleRelease; then
