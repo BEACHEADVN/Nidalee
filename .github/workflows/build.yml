@@ -90,7 +90,7 @@ jobs:
       - name: Attach arm64-v8a APK file
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.APK_BASENAME_PREFIX }}_arm64-v8a
+          name: arm64-apk
           path: |
-            ${{ env.APK_DIR_PATH }}/${{ env.APK_BASENAME_PREFIX }}_arm64-v8a.apk
+            ${{ env.APK_DIR_PATH }}/*arm64-v8a.apk
             ${{ env.APK_DIR_PATH }}/output-metadata.json
