@@ -117,23 +117,31 @@ jobs:
           BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           CHAT_ID: ${{ secrets.TELEGRAM_USER_ID }}
         run: |
-          # 1. Tìm tất cả file apk trong thư mục release
-          # Sử dụng 'find' để lấy danh sách đường dẫn đầy đủ
           APK_FILES=$(find ./app/build/outputs/apk/release -name "*.apk" -type f)
           
-          # 2. Duyệt qua từng file tìm được
           for FILE_PATH in $APK_FILES; do
-            # Lấy tên file từ đường dẫn (ví dụ: arm64-v8a.apk)
-            FILENAME=$(basename "$FILE_PATH")
-            
+            # 1. Tạo tên file tạm thời đơn giản để tránh lỗi ký tự đặc biệt
+            # Ví dụ: temp_arm64-v8a.apk
+            ARCH=$(echo "$FILE_PATH" | grep -oE "arm64-v8a|armeabi-v7a|x86_64|x86" || echo "unknown")
+            TEMP_NAME="Nidalee_${ARCH}.apk"
+            cp "$FILE_PATH" "./$TEMP_NAME"
+
             echo "------------------------------------------"
-            echo "Đang gửi: $FILENAME"
+            echo "Đang gửi file gốc: $(basename "$FILE_PATH") dưới tên $TEMP_NAME"
             
-            # 3. Sử dụng lệnh curl để gọi API Telegram gửi Document
-            curl -s -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendDocument" \
+            # 2. Gửi file đã đổi tên
+            RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendDocument" \
               -F "chat_id=$CHAT_ID" \
-              -F "document=@$FILE_PATH" \
+              -F "document=@./$TEMP_NAME" \
               -F "parse_mode=HTML" \
-              -F "caption=<b>Artifact:</b> <code>$FILENAME</code>%0A<b>Repo:</b> ${{ github.repository }}" \
-              --fail || echo "Lỗi khi gửi file $FILENAME"
+              -F "caption=<b>Artifact:</b> <code>$(basename "$FILE_PATH")</code>%0A<b>Repo:</b> ${{ github.repository }}")
+            
+            HTTP_STATUS=$(echo "$RESPONSE" | tail -n 1)
+            BODY=$(echo "$RESPONSE" | head -n -1)
+
+            if [ "$HTTP_STATUS" -ne 200 ]; then
+              echo "Lỗi gửi file! Mã lỗi HTTP: $HTTP_STATUS"
+              echo "Phản hồi từ Telegram: $BODY"
+              exit 1
+            fi
           done
