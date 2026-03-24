@@ -141,9 +141,20 @@ jobs:
           <code>${{ steps.commit_info.outputs.msg }}</code>
          parse_mode: HTML
 
-         # TRỎ THẲNG VÀO FILE TRONG THƯ MỤC ANYKERNEL3
-        # Dùng wildcard tên file để khớp với biến file_name của bạn
-         path: ./app/build/outputs/apk/release/${{ env.APK_BASENAME_PREFIX }}_arm64-v8a.apk
-         method: sendDocument
+          FILE=$(find ./app/build/outputs/apk/release -name "*arm64-v8a.apk" | head -n 1)
 
+          if [ -z "$FILE" ]; then
+          echo "❌ Không tìm thấy APK"
+          exit 1
+          fi
+   
+          NAME=$(basename "$FILE")
 
+         echo "📤 Gửi: $NAME"
+
+          curl -L \
+          -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendDocument" \
+          -F chat_id="${CHAT_ID}" \
+          -F "document=@${FILE};filename=${NAME}" \
+          -F parse_mode=HTML \
+          -F "caption=<b>APK:</b> <code>${NAME}</code>%0A<b>Repo:</b> ${{ github.repository }}"
