@@ -122,40 +122,39 @@ jobs:
           parse_mode: HTML
           method: sendMessage
           
-      - name: Send APK via Node.js
-        shell: node {0}
+      - name: Send APK via Python
+        shell: python3 {0}
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
-          FILE_PATH: ${{ env.FULL_PATH }} # Đảm bảo bạn đã set FULL_PATH ở bước trước
+          FILE_PATH: ${{ env.FULL_PATH }}
           FILE_NAME: ${{ env.NAME }}
         run: |
-          const fs = require('fs');
-          const https = require('https');
-          const FormData = require('form-data'); // Có sẵn trên runner
+          import os
+          import requests # Thư viện này luôn có sẵn trên GitHub Runner
   
-          const form = new FormData();
-          form.append('chat_id', process.env.CHAT_ID);
-          form.append('document', fs.createReadStream(process.env.FILE_PATH), { filename: process.env.FILE_NAME });
-          form.append('parse_mode', 'HTML');
-          form.append('caption', `<b>APK:</b> <code>${process.env.FILE_NAME}</code>\n<b>Repo:</b> BEACHEADVN/Nidalee`);
+          bot_token = os.environ['BOT_TOKEN']
+          chat_id = os.environ['CHAT_ID']
+          file_path = os.environ['FILE_PATH']
+          file_name = os.environ['FILE_NAME']
   
-          const options = {
-            method: 'POST',
-            hostname: 'api.telegram.org',
-            path: `/bot${process.env.BOT_TOKEN}/sendDocument`,
-            headers: form.getHeaders(),
-          };
+          url = f"https://api.telegram.org/bot{bot_token}/sendDocument"
+          caption = f"<b>APK:</b> <code>{file_name}</code>\n<b>Repo:</b> BEACHEADVN/Nidalee"
   
-          const req = https.request(options, (res) => {
-            console.log(`HTTP Status: ${res.statusCode}`);
-            res.on('data', (d) => process.stdout.write(d));
-            if (res.statusCode !== 200) process.exit(1);
-          });
+          print(f"📤 Đang gửi file: {file_name} (Size: {os.path.getsize(file_path)} bytes)")
   
-          req.on('error', (e) => {
-            console.error(e);
-            process.exit(1);
-          });
+          with open(file_path, 'rb') as f:
+              files = {'document': (file_name, f)}
+              data = {
+                  'chat_id': chat_id,
+                  'parse_mode': 'HTML',
+                  'caption': caption
+              }
+              response = requests.post(url, data=data, files=files, timeout=60)
   
-          form.pipe(req);
+          if response.status_code == 200:
+              print("✅ Gửi thành công!")
+          else:
+              print(f"❌ Thất bại! Status: {response.status_code}")
+              print(response.text)
+              exit(1)
