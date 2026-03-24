@@ -71,7 +71,7 @@ jobs:
           if ! ./gradlew assembleRelease; then
             exit_on_error "Build failed"
           fi
-          echo '•••VIJ TRÍ HIỆN TAIJ••••"
+          echo "•••VIJ TRÍ HIỆN TAIJ••••"
           pwd
 
           echo "Validating APKs"
