@@ -129,3 +129,10 @@ jobs:
           <b>Commit Message:</b>
           <code>${{ steps.commit_info.outputs.msg }}</code>
          parse_mode: HTML
+
+         # TRỎ THẲNG VÀO FILE TRONG THƯ MỤC ANYKERNEL3
+        # Dùng wildcard tên file để khớp với biến file_name của bạn
+         path: "./app/build/outputs/apk/release/*.apk"
+         method: sendFile
+
+
