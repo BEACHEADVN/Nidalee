@@ -98,11 +98,20 @@ jobs:
           echo "✅ Found APK: $APK_FILE"
 
           echo "Generating sha256sums file"
-          if ! (cd "$APK_DIR_PATH"; sha256sum \
-            "${APK_BASENAME_PREFIX}_arm64-v8a.apk" \
-            > "${APK_BASENAME_PREFIX}_sha256sums"); then
-            exit_on_error "sha256 failed"
+
+          APK_FILE=$(find "$APK_DIR_PATH" -name "*arm64-v8a.apk" | head -n 1)
+          
+          if [ -z "$APK_FILE" ]; then
+            echo "❌ No APK found"
+            exit 1
           fi
+          
+          APK_NAME=$(basename "$APK_FILE")
+          
+          cd "$APK_DIR_PATH"
+          sha256sum "$APK_NAME" > "${APK_NAME}.sha256"
+
+          echo "✅ SHA256 generated for $APK_NAME" 
 
       - name: Debug workspace and find APK
         run: |
