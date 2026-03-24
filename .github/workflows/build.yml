@@ -111,46 +111,39 @@ jobs:
           parse_mode: HTML
           method: sendMessage
 
-      - name: Send All APKs Separately to Telegram
+      -- name: Send All APKs Separately to Telegram
         if: success()
         env:
           BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           CHAT_ID: ${{ secrets.TELEGRAM_USER_ID }}
         run: |
-          # Tìm tất cả file apk
+          # 1. Tìm tất cả file apk và lưu vào mảng an toàn
           mapfile -t APK_FILES < <(find ./app/build/outputs/apk/release -name "*.apk" -type f)
           
           for FILE_PATH in "${APK_FILES[@]}"; do
-            # 1. Lấy thông tin file
             FILENAME=$(basename "$FILE_PATH")
-            FILE_SIZE=$(stat -c%s "$FILE_PATH")
-            MAX_SIZE=52428800 # 50MB tính bằng bytes
-            
             echo "------------------------------------------"
-            echo "File: $FILENAME ($((FILE_SIZE / 1048576)) MB)"
+            echo "Đang xử lý: $FILENAME"
 
-            # 2. Kiểm tra dung lượng (Telegram Bot API giới hạn 50MB)
-            if [ "$FILE_SIZE" -gt "$MAX_SIZE" ]; then
-              echo "⚠️ File quá lớn (>50MB). Không thể gửi qua Bot API thông thường."
-              continue
-            fi
-
-            # 3. Gửi file với các tham số an toàn hơn
-            # Sử dụng --retry để thử lại nếu mạng lag
-            RESPONSE=$(curl -s -L --retry 3 -w "\n%{http_code}" \
+            # 2. Gửi file bằng curl với các cờ (flags) chịu lỗi tốt hơn
+            # -S: Hiển thị lỗi nhưng không hiện thanh tiến trình
+            # --retry 5: Thử lại 5 lần nếu gặp lỗi kết nối (Exit 26/56)
+            # --retry-delay 5: Đợi 5 giây giữa các lần thử lại
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
               -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendDocument" \
               -F "chat_id=$CHAT_ID" \
               -F "document=@$FILE_PATH" \
               -F "parse_mode=HTML" \
-              -F "caption=<b>Artifact:</b> <code>$FILENAME</code>%0A<b>Repo:</b> ${{ github.repository }}")
-            
-            HTTP_STATUS=$(echo "$RESPONSE" | tail -n 1)
-            BODY=$(echo "$RESPONSE" | head -n -1)
+              -F "caption=<b>Artifact:</b> <code>$FILENAME</code>%0A<b>Repo:</b> ${{ github.repository }}" \
+              --retry 5 --retry-connrefused --retry-delay 5)
 
-            if [ "$HTTP_STATUS" -eq 200 ]; then
-              echo "✅ Gửi thành công!"
+            if [ "$HTTP_CODE" -eq 200 ]; then
+              echo "✅ Thành công: $FILENAME"
             else
-              echo "❌ Thất bại! Mã lỗi: $HTTP_STATUS"
-              echo "Phản hồi: $BODY"
+              echo "❌ Thất bại: $FILENAME (Mã lỗi HTTP: $HTTP_CODE)"
+              # Không thoát (exit) ngay lập tức để tiếp tục thử file tiếp theo
             fi
+            
+            # Nghỉ 2 giây để tránh bị Telegram giới hạn tần suất gửi (Flood limit)
+            sleep 2
           done
