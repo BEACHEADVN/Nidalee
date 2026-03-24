@@ -121,23 +121,21 @@ jobs:
             <b>Repository:</b> <a href="https://github.com/${{ github.repository }}">${{ github.repository }}</a>
           parse_mode: HTML
           method: sendMessage
+
+      - name: Get APK Path
+        id: apk
+        run: |
+          APK_FILE=$(find ./app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          echo "apk_path=$APK_FILE" >> $GITHUB_OUTPUT
+          echo "apk_name=$(basename $APK_FILE)" >> $GITHUB_OUTPUT
+          echo "tên file apk"
+          echo $APK_FILE
   
-      - name: Upload Kernel to Telegram
-        if: success()
+      - name: Upload to Telegram
         uses: xireiki/channel-post@v1
         with:
           bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           chat_id: ${{ secrets.TELEGRAM_USER_ID }}
-          context: |
-            <b>Version:</b> <code>${{ steps.extract.outputs.file_name }}</code>
-            <b>Variant:</b> <code>${{ inputs.variant || 'Normal' }}</code>
-            <b>Features:</b> <code>${{ inputs.feature_set }}</code>
-            <b>Repository:</b> <a href="https://github.com/${{ github.repository }}">${{ github.repository }}</a>
-            <b>Branch:</b> <a href="https://github.com/${{ github.repository }}/tree/${{ github.ref_name }}">${{ github.ref_name }}</a>
-            <b>Commit:</b> <a href="https://github.com/${{ github.repository }}/commit/${{ github.sha }}">${{ steps.commit_info.outputs.short_sha }}</a>
-            <b>Workflow:</b> <a href="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}">View Run</a>
-            <b>Commit Message:</b>
-            <code>${{ steps.commit_info.outputs.msg }}</code>
-          parse_mode: HTML
-          path: "./app/build/outputs/apk/release/termux-app_${{ env.APK_VERSION_TAG }}_arm64-v8a.apk"
+          path: ${{ steps.apk.outputs.apk_path }}
           method: sendDocument
+          api_server_file_name: ${{ steps.apk.outputs.apk_name }}
