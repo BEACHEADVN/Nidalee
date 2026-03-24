@@ -184,6 +184,8 @@ jobs:
           # Dùng shell để xóa phần 'github-releases/'
           CLEAN_VERSION="${RAW_REF#github-releases/}"
           echo "file_name=$CLEAN_VERSION" >> $GITHUB_OUTPUT
+          echo "TÊN VERSION"
+          echo $CLEAN_VERSION
   
       - name: Upload to Telegram
         uses: xireiki/channel-post@v1
