@@ -138,7 +138,7 @@ jobs:
           fi
       
           NAME=$(basename "$FILE")
-      
+          ls -lh "${FILE}"
           # Đảm bảo đường dẫn file là tuyệt đối để tránh nhầm lẫn build directory
           FULL_PATH=$(readlink -f "$FILE")
         
