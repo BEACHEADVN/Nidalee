@@ -71,10 +71,6 @@ jobs:
           if ! ./gradlew assembleRelease; then
             exit_on_error "Build failed"
           fi
-          echo "•••VIJ TRÍ HIỆN TAIJ••••"
-          pwd
-          find . -name "*.apk"
-          #exit 1
 
           echo "Validating APKs"
           for abi in arm64-v8a; do
@@ -98,6 +94,20 @@ jobs:
           path: |
             ${{ env.APK_DIR_PATH }}/*arm64-v8a.apk
             ${{ env.APK_DIR_PATH }}/output-metadata.json
+            
+      - name: Debug workspace and find APK
+        run: |
+         echo "📂 Thư mục hiện tại:"
+         pwd
+
+         echo "📁 Liệt kê toàn bộ file:"
+         ls -R
+
+         echo "🔍 Tìm file APK:"
+         find . -type f -name "*.apk"
+
+         #echo "🔍 Tìm APK trong thư mục build (nếu có):"
+         #find ./app/build/outputs/apk -type f -name "*.apk" 2>/dev/null || echo "Không có thư mục build"
 
       - name: Send Notification to Telegram
         if: success()
