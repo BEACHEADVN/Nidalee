@@ -111,7 +111,7 @@ jobs:
           parse_mode: HTML
           method: sendMessage
 
-      -- name: Send All APKs Separately to Telegram
+      - name: Send All APKs Separately to Telegram
         if: success()
         env:
           BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
