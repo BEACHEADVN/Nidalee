@@ -73,6 +73,7 @@ jobs:
           fi
           echo "•••VIJ TRÍ HIỆN TAIJ••••"
           pwd
+          find . -name "*.apk"
           exit 1
 
           echo "Validating APKs"
