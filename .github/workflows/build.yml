@@ -179,6 +179,11 @@ jobs:
 
           echo "tên file apk"
           echo $APK_FILE
+          # Lấy tên branch/tag
+          RAW_REF="${{ github.ref_name }}"
+          # Dùng shell để xóa phần 'github-releases/'
+          CLEAN_VERSION="${RAW_REF#github-releases/}"
+          echo "file_name=$CLEAN_VERSION" >> $GITHUB_OUTPUT
   
       - name: Upload to Telegram
         uses: xireiki/channel-post@v1
@@ -191,7 +196,7 @@ jobs:
           # Sử dụng 'context' thay vì 'caption'
           parse_mode: HTML
           context: |
-            <b>Version:</b> <code>${{ replace(github.ref_name, 'github-releases/', '') }}</code>
+            <b>Version:</b> <code>${{ steps.extract.outputs.file_name }}</code>
             <b>Repository:</b> <a href="https://github.com/${{ github.repository }}">${{ github.repository }}</a>
             <b>Branch:</b> <a href="https://github.com/${{ github.repository }}/tree/${{ github.ref_name }}">${{ github.ref_name }}</a>
             <b>Commit:</b> <a href="https://github.com/${{ github.repository }}/commit/${{ github.sha }}">${{ steps.commit_info.outputs.short_sha }}</a>
