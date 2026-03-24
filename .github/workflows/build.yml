@@ -115,13 +115,19 @@ jobs:
          #echo "🔍 Tìm APK trong thư mục build (nếu có):"
          #find ./app/build/outputs/apk -type f -name "*.apk" 2>/dev/null || echo "Không có thư mục build"
 
-      - name: Attach arm64-v8a APK file
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.APK_BASENAME_PREFIX }}_arm64-v8a
-          path: |
-            ${{ env.APK_DIR_PATH }}/*arm64-v8a.apk
-            ${{ env.APK_DIR_PATH }}/output-metadata.json
+      - name: Validate APK
+        run: |
+          echo "Validating APKs"
+      
+          APK_FILE=$(find "$APK_DIR_PATH" -name "*arm64-v8a.apk" | head -n 1)
+      
+          if [ -z "$APK_FILE" ]; then
+            ls -R "$APK_DIR_PATH"
+            echo "❌ Missing APK arm64-v8a"
+            exit 1
+          fi
+
+          echo "✅ Found: $APK_FILE"
             
       - name: Send Notification to Telegram
         if: success()
