@@ -26,6 +26,18 @@ jobs:
         run: |
           echo "${{ secrets.KEYSTORE }}" | base64 -d > app/keystore.jks
 
+      - name: Send Notification to Telegram
+        if: success()
+        uses: xireiki/channel-post@v1
+        with:
+         bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+         chat_id: ${{ secrets.TELEGRAM_USER_ID }}
+         context: |
+          <b>Repository:</b> <a href="https://github.com/${{ github.repository }}">${{ github.repository }}</a>
+          parse_mode: HTML
+          method: sendMessage
+
+
       - name: Build APKs
         shell: bash {0}
         env:
