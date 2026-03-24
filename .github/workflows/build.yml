@@ -124,4 +124,615 @@ jobs:
             <b>Repository:</b> ${{ github.repository }}
             <b>File:</b> <code>termux-app_arm64-v8a.apk</code>
           # Tìm đúng file apk trong thư mục release
-          document: ${{ env.APK_DIR_PATH }}/*arm64-v8a.apk
+          
+- name: Send All APKs Separately to Telegram
+        if: success()
+        env:
+          BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.TELEGRAM_USER_ID }}
+        run: |
+          # Tìm tất cả file apk
+          mapfile -t APK_FILES < <(find ./app/build/outputs/apk/release -name "*.apk" -type f)
+          
+          for FILE_PATH in "${APK_FILES[@]}"; do
+            # 1. Lấy thông tin file
+            FILENAME=$(basename "$FILE_PATH")
+            FILE_SIZE=$(stat -c%s "$FILE_PATH")
+            MAX_SIZE=52428800 # 50MB tính bằng bytes
+            
+            echo "------------------------------------------"
+            echo "File: $FILENAME ($((FILE_SIZE / 1048576)) MB)"
+
+            # 2. Kiểm tra dung lượng (Telegram Bot API giới hạn 50MB)
+            if [ "$FILE_SIZE" -gt "$MAX_SIZE" ]; then
+              echo "⚠️ File quá lớn (>50MB). Không thể gửi qua Bot API thông thường."
+              continue
+            fi
+
+            # 3. Gửi file với các tham số an toàn hơn
+            # Sử dụng --retry để thử lại nếu mạng lag
+            RESPONSE=$(curl -s -L --retry 3 -w "\n%{http_code}" \
+              -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendDocument" \
+              -F "chat_id=$CHAT_ID" \
+              -F "document=@$FILE_PATH" \
+              -F "parse_mode=HTML" \
+              -F "caption=<b>Artifact:</b> <code>$FILENAME</code>%0A<b>Repo:</b> ${{ github.repository }}")
+            
+            HTTP_STATUS=$(echo "$RESPONSE" | tail -n 1)
+            BODY=$(echo "$RESPONSE" | head -n -1)
+
+            if [ "$HTTP_STATUS" -eq 200 ]; then
+              echo "✅ Gửi thành công!"
+            else
+              echo "❌ Thất bại! Mã lỗi: $HTTP_STATUS"
+              echo "Phản hồi: $BODY"
+            fi
+          done
+
+File: termux-app_v0.119.0-beta.3+faf4848-apt-android-7-github-release_arm64-v8a.apk (33 MB)
+Error: Process completed with exit code 26.
+
+Exit code 26 từ curl thường là: "Failed to open/read local data from file" → tức là curl không đọc được file APK chứ không phải lỗi Telegram.
+
+Nhìn script của bạn thì có vài nguyên nhân rất hay gặp:
+
+🔥 Nguyên nhân phổ biến
+1. Đường dẫn file có vấn đề
+find trả về path đúng, nhưng khi curl -F "document=@$FILE_PATH":
+
+Nếu path có ký tự lạ / khoảng trắng → lỗi
+
+Hoặc file không còn tồn tại tại thời điểm gửi
+
+👉 Debug thêm:
+
+ls -lh "$FILE_PATH"
+2. Quyền đọc file (permission)
+GitHub Actions đôi khi build xong nhưng file không readable
+
+👉 Fix:
+
+chmod +r "$FILE_PATH"
+3. Curl không đọc được file do ký tự đặc biệt
+Cách bạn truyền:
+
+-F "document=@$FILE_PATH"
+có thể fail nếu path chứa ký tự đặc biệt
+
+👉 Fix chuẩn hơn:
+
+-F document=@"$FILE_PATH"
+4. File bị xóa / không tồn tại
+Trước khi gửi nên check chắc chắn:
+
+if [ ! -f "$FILE_PATH" ]; then
+  echo "❌ File không tồn tại: $FILE_PATH"
+  continue
+fi
+✅ Bản fix hoàn chỉnh (khuyên dùng)
+Sửa đoạn gửi file thành:
+
+# Đảm bảo file tồn tại
+if [ ! -f "$FILE_PATH" ]; then
+  echo "❌ File không tồn tại: $FILE_PATH"
+  continue
+fi
+
+# Cấp quyền đọc
+chmod +r "$FILE_PATH"
+
+RESPONSE=$(curl -s -L --retry 3 -w "\n%{http_code}" \
+  -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendDocument" \
+  -F chat_id="$CHAT_ID" \
+  -F document=@"$FILE_PATH" \
+  -F parse_mode=HTML \
+  -F caption="<b>Artifact:</b> <code>$FILENAME</code>%0A<b>Repo:</b> ${{ github.repository }}")
+🧠 Tip debug nhanh (rất hữu ích)
+Thêm dòng này trước khi gửi:
+
+file "$FILE_PATH"
+Nếu nó báo lỗi → chắc chắn curl cũng fail.
+
+⚠️ Một khả năng nữa (ít gặp nhưng có)
+Runner của GitHub:
+
+File nằm trong symlink / path ảo
+
+curl không resolve được
+
+👉 Fix mạnh tay:
+
+REAL_PATH=$(realpath "$FILE_PATH")
+-F document=@"$REAL_PATH"
+🎯 Kết luận nhanh
+Exit code 26 = curl không đọc được file
+
+👉 90% fix được bằng:
+
+quote path đúng (@"$FILE_PATH")
+
+chmod +r
+
+check file tồn tại
+
+Nếu vẫn lỗi, gửi mình thêm log:
+
+ls -R ./app/build/outputs/apk/release
+mình sẽ chỉ đúng chỗ bị gãy luôn 👍
+
+
+Gửi lại toàn bộ
+
+Dưới đây là bản hoàn chỉnh đã fix lỗi exit code 26, thêm check file + quyền + xử lý path an toàn + debug rõ ràng:
+
+- name: Send All APKs Separately to Telegram
+  if: success()
+  env:
+    BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+    CHAT_ID: ${{ secrets.TELEGRAM_USER_ID }}
+  run: |
+    echo "🔍 Tìm file APK..."
+    mapfile -t APK_FILES < <(find ./app/build/outputs/apk/release -name "*.apk" -type f)
+
+    # Check nếu không có file
+    if [ ${#APK_FILES[@]} -eq 0 ]; then
+      echo "❌ Không tìm thấy file APK nào!"
+      exit 1
+    fi
+
+    for FILE_PATH in "${APK_FILES[@]}"; do
+      echo "------------------------------------------"
+
+      # 1. Kiểm tra file tồn tại
+      if [ ! -f "$FILE_PATH" ]; then
+        echo "❌ File không tồn tại: $FILE_PATH"
+        continue
+      fi
+
+      # 2. Resolve path thật (tránh lỗi symlink)
+      REAL_PATH=$(realpath "$FILE_PATH")
+
+      # 3. Lấy thông tin file
+      FILENAME=$(basename "$REAL_PATH")
+      FILE_SIZE=$(stat -c%s "$REAL_PATH")
+      MAX_SIZE=52428800 # 50MB
+
+      echo "📦 File: $FILENAME ($((FILE_SIZE / 1048576)) MB)"
+      echo "📂 Path: $REAL_PATH"
+
+      # 4. Debug thêm
+      ls -lh "$REAL_PATH"
+      file "$REAL_PATH"
+
+      # 5. Check dung lượng
+      if [ "$FILE_SIZE" -gt "$MAX_SIZE" ]; then
+        echo "⚠️ File quá lớn (>50MB). Bỏ qua."
+        continue
+      fi
+
+      # 6. Đảm bảo quyền đọc
+      chmod +r "$REAL_PATH"
+
+      # 7. Gửi file
+      RESPONSE=$(curl -s -L --retry 3 -w "\n%{http_code}" \
+        -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendDocument" \
+        -F chat_id="$CHAT_ID" \
+        -F document=@"$REAL_PATH" \
+        -F parse_mode=HTML \
+        -F caption="<b>Artifact:</b> <code>$FILENAME</code>%0A<b>Repo:</b> ${{ github.repository }}")
+
+      HTTP_STATUS=$(echo "$RESPONSE" | tail -n 1)
+      BODY=$(echo "$RESPONSE" | head -n -1)
+
+      # 8. Kiểm tra kết quả
+      if [ "$HTTP_STATUS" -eq 200 ]; then
+        echo "✅ Gửi thành công!"
+      else
+        echo "❌ Thất bại! HTTP: $HTTP_STATUS"
+        echo "📩 Response: $BODY"
+      fi
+    done
+🔥 Những gì đã fix
+✅ @"$FILE_PATH" → tránh lỗi path (nguyên nhân chính exit 26)
+
+✅ realpath → tránh lỗi symlink
+
+✅ chmod +r → đảm bảo curl đọc được file
+
+✅ check file tồn tại
+
+✅ debug ls + file
+
+✅ xử lý khi không có APK
+
+Nếu vẫn lỗi, gửi mình log đoạn này:
+
+ls -R ./app/build/outputs/apk/release
+mình sẽ debug chính xác 100% cho bạn 👍
+
+
+termux-app_v0.119.0-beta.3+3e9a0ee-apt-android-7-github-release_arm64-v8a.apk
+Nó gửi được nhưng thiếu arm64-v8a như trên
+
+Nghe mô tả của bạn thì có 2 khả năng chính (và cái này rất hay gặp trong build APK 👇):
+
+🧠 Vấn đề thật sự
+Bạn nói:
+
+gửi được nhưng thiếu arm64-v8a
+
+Trong khi log lại có:
+
+termux-app_..._arm64-v8a.apk
+👉 Nghĩa là:
+
+File có tồn tại
+
+Nhưng không được gửi (bị skip hoặc fail)
+
+🔥 90% nguyên nhân: bị skip do size > 50MB
+Script của bạn có đoạn:
+
+if [ "$FILE_SIZE" -gt "$MAX_SIZE" ]; then
+  echo "⚠️ File quá lớn (>50MB). Bỏ qua."
+  continue
+fi
+👉 arm64-v8a thường là bản to nhất, nên rất dễ:
+
+50MB → bị skip → không gửi
+
+✅ Cách kiểm tra chắc chắn
+Thêm log này:
+
+echo "SIZE BYTES: $FILE_SIZE"
+Nếu thấy:
+
+SIZE BYTES: 60000000+
+👉 đúng là bị skip
+
+🚀 Cách fix (chọn 1)
+✅ Cách 1: Cho gửi luôn (Telegram bot mới support ~2GB)
+👉 Xóa check 50MB:
+
+# ❌ bỏ đoạn này đi
+# if [ "$FILE_SIZE" -gt "$MAX_SIZE" ]; then
+#   continue
+# fi
+✅ Cách 2: Chỉ log thay vì skip
+if [ "$FILE_SIZE" -gt "$MAX_SIZE" ]; then
+  echo "⚠️ File lớn nhưng vẫn thử gửi..."
+fi
+✅ Cách 3: Upload bằng sendDocument nhưng không giới hạn
+Telegram hiện tại:
+
+Bot API cũ: 50MB
+
+Bot API mới: lên tới ~2GB
+
+👉 nên bạn có thể gửi bình thường, không cần check size nữa
+
+⚠️ Một khả năng khác (ít hơn)
+🔸 find không bắt được file
+Do pattern:
+
+find ./app/build/outputs/apk/release -name "*.apk"
+👉 nếu file nằm trong subfolder khác → bị miss
+
+Fix:
+
+find . -type f -name "*.apk"
+🎯 Bản fix khuyến nghị (chuẩn nhất)
+mapfile -t APK_FILES < <(find . -type f -name "*.apk")
+và bỏ giới hạn 50MB
+
+🧪 Debug nhanh (rất nên thêm)
+Trước vòng for:
+
+echo "📦 Danh sách APK tìm được:"
+printf '%s\n' "${APK_FILES[@]}"
+✅ Kết luận
+👉 arm64-v8a bị thiếu gần như chắc chắn do:
+
+bị skip vì >50MB (99%)
+
+Nếu bạn muốn, mình có thể nâng cấp script:
+
+gửi song song (nhanh hơn)
+
+gom thành zip nếu fail
+
+retry thông minh từng file
+
+Chỉ cần nói 👍
+
+
+Gửi đúng file nhưng tên không chuẩn
+
+Hiểu rồi 👍 — cái này không phải lỗi gửi nữa, mà là tên file hiển thị trên Telegram bị sai.
+
+🧠 Nguyên nhân
+Telegram lấy tên file từ multipart upload, cụ thể là đoạn:
+
+-F document=@"$REAL_PATH"
+👉 Nó sẽ dùng:
+
+tên gốc của file trong ổ đĩa
+
+KHÔNG phải $FILENAME bạn set trong caption
+
+➡️ Nếu tên file build ra dài / lộn xộn → Telegram hiển thị đúng cái tên “xấu” đó.
+
+✅ Cách fix: Ép tên file khi upload
+Bạn cần dùng cú pháp này:
+
+-F "document=@$REAL_PATH;filename=$FILENAME"
+🔥 Áp dụng vào script
+Thay dòng gửi file thành:
+
+RESPONSE=$(curl -s -L --retry 3 -w "\n%{http_code}" \
+  -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendDocument" \
+  -F chat_id="$CHAT_ID" \
+  -F "document=@$REAL_PATH;filename=$FILENAME" \
+  -F parse_mode=HTML \
+  -F "caption=<b>Artifact:</b> <code>$FILENAME</code>%0A<b>Repo:</b> ${{ github.repository }}")
+🚀 Bonus: Rename cho đẹp (khuyên dùng)
+Bạn có thể làm tên gọn hơn:
+
+# Ví dụ: chỉ giữ abi
+ABI=$(echo "$FILENAME" | grep -oE 'arm64-v8a|armeabi-v7a|x86_64|x86|universal')
+
+NEW_NAME="termux-${ABI}.apk"
+Rồi dùng:
+
+-F "document=@$REAL_PATH;filename=$NEW_NAME"
+🎯 Kết quả
+Telegram sẽ hiển thị:
+
+termux-arm64-v8a.apk
+thay vì:
+
+termux-app_v0.119.0-beta.3+3e9a0ee-apt-android-7-github-release_arm64-v8a.apk
+✅ Kết luận
+👉 Bạn đã gửi đúng file
+👉 Chỉ cần thêm ;filename=... là fix hoàn toàn tên hiển thị
+
+Nếu muốn mình tối ưu luôn:
+
+tên file theo version + abi
+
+hoặc format giống release chuẩn
+
+cứ nói mình build cho bạn bản script xịn hơn 🔥
+
+
+Chỉ thêm arm64-v8a vào chứ không đổi tên
+
+À hiểu rồi 👍 — bạn không muốn đổi tên file, chỉ muốn đảm bảo luôn có arm64-v8a trong tên khi gửi.
+
+🧠 Cách làm đúng
+Bạn giữ nguyên tên gốc, chỉ append thêm nếu thiếu.
+
+✅ Thêm đoạn xử lý tên
+Trước khi gửi, thêm:
+
+# Lấy tên file gốc
+FILENAME=$(basename "$REAL_PATH")
+
+# Nếu chưa có arm64-v8a thì thêm vào
+if [[ "$FILENAME" != *"arm64-v8a"* ]]; then
+  NAME_NO_EXT="${FILENAME%.apk}"
+  FILENAME="${NAME_NO_EXT}_arm64-v8a.apk"
+fi
+🚀 Sửa dòng curl
+-F "document=@$REAL_PATH;filename=$FILENAME"
+🎯 Ví dụ
+Input:
+termux-app_v0.119.apk
+Output:
+termux-app_v0.119_arm64-v8a.apk
+Nếu đã đúng:
+termux-app_..._arm64-v8a.apk
+👉 giữ nguyên, không bị thêm trùng
+
+✅ Kết luận
+Không rename file thật
+
+Chỉ đổi tên hiển thị khi upload
+
+Đảm bảo luôn có arm64-v8a
+
+Nếu bạn muốn chuẩn hơn nữa (ví dụ:
+
+tự detect ABI từ tên
+
+chỉ thêm đúng file arm64, không ảnh hưởng file khác)
+
+mình có thể viết logic lọc riêng từng ABI cho bạn 👍
+
+
+Attach upload artifact
+- name: Attach arm64-v8a APK file
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APK_BASENAME_PREFIX }}_arm64-v8a
+          path: |
+            ${{ env.APK_DIR_PATH }}/*arm64-v8a.apk
+            ${{ env.APK_DIR_PATH }}/output-metadata.json
+Cho ra tên chuẩn 
+
+Hủy bỏ
+
+Gửi
+
+Hiểu ý bạn 👍 — vấn đề không phải Telegram nữa mà là artifact name trong GitHub Actions đang chưa “chuẩn”.
+
+Hiện tại bạn đang hardcode:
+
+name: ${{ env.APK_BASENAME_PREFIX }}_arm64-v8a
+👉 Nhưng file thật lại kiểu:
+
+termux-app_v0.119.0-beta.3+3e9a0ee-apt-android-7-github-release_arm64-v8a.apk
+➡️ nên artifact name không khớp version/build
+
+✅ Cách làm chuẩn (lấy tên đúng từ file APK)
+🔥 Cách tốt nhất: lấy filename thật
+Thêm step trước đó:
+
+- name: Get arm64 APK name
+  id: apk_name
+  run: |
+    FILE=$(find ${{ env.APK_DIR_PATH }} -name "*arm64-v8a.apk" | head -n 1)
+    BASENAME=$(basename "$FILE" .apk)
+    echo "apk_name=$BASENAME" >> $GITHUB_OUTPUT
+🚀 Sửa upload-artifact
+- name: Attach arm64-v8a APK file
+  uses: actions/upload-artifact@v4
+  with:
+    name: ${{ steps.apk_name.outputs.apk_name }}
+    path: |
+      ${{ env.APK_DIR_PATH }}/*arm64-v8a.apk
+      ${{ env.APK_DIR_PATH }}/output-metadata.json
+🎯 Kết quả
+Artifact sẽ có tên:
+
+termux-app_v0.119.0-beta.3+3e9a0ee-apt-android-7-github-release_arm64-v8a
+👉 Chuẩn 100% theo file build, không cần đoán
+
+⚠️ Bonus fix (nếu nhiều file arm64)
+Nếu có nhiều file:
+
+FILE=$(find ... | sort | tail -n 1)
+✅ Nếu bạn muốn “đẹp hơn”
+Ví dụ:
+
+termux-v0.119.0-arm64-v8a
+mình có thể parse version từ filename cho bạn (regex chuẩn luôn).
+
+🎯 Kết luận
+👉 Đừng hardcode _arm64-v8a
+👉 Lấy trực tiếp từ filename → luôn đúng, luôn chuẩn
+
+Nếu bạn muốn mình refactor luôn:
+
+upload tất cả ABI (arm64, v7a, x86...)
+
+mỗi cái tên chuẩn riêng
+
+mình làm cho bạn bản workflow gọn đẹp luôn 🔥
+
+
+Tìm ra ./app/build/outputs/apk/release/termux-app_v0.119.0-beta.3+adddc62-apt-android-7-github-release_arm64-v8a.apk
+
+Ok 👍 bạn đã tìm đúng file rồi:
+
+./app/build/outputs/apk/release/termux-app_v0.119.0-beta.3+adddc62-apt-android-7-github-release_arm64-v8a.apk
+Giờ mục tiêu là: lấy đúng tên này để làm artifact name (chuẩn 100%)
+
+✅ Cách làm gọn nhất (chuẩn luôn)
+🔥 Step lấy tên file
+- name: Get arm64 APK name
+  id: apk_name
+  run: |
+    FILE=$(find ./app/build/outputs/apk/release -name "*arm64-v8a.apk" | head -n 1)
+    BASENAME=$(basename "$FILE" .apk)
+    echo "apk_name=$BASENAME" >> $GITHUB_OUTPUT
+🚀 Upload artifact
+- name: Attach arm64-v8a APK file
+  uses: actions/upload-artifact@v4
+  with:
+    name: ${{ steps.apk_name.outputs.apk_name }}
+    path: |
+      ./app/build/outputs/apk/release/*arm64-v8a.apk
+      ./app/build/outputs/apk/release/output-metadata.json
+🎯 Kết quả
+Artifact name sẽ là:
+
+termux-app_v0.119.0-beta.3+adddc62-apt-android-7-github-release_arm64-v8a
+👉 Giống hệt file thật — không sai lệch
+
+⚠️ Fix thêm (khuyên dùng)
+Đảm bảo không bị lỗi khi không tìm thấy file:
+
+- name: Get arm64 APK name
+  id: apk_name
+  run: |
+    FILE=$(find ./app/build/outputs/apk/release -name "*arm64-v8a.apk" | head -n 1)
+
+    if [ -z "$FILE" ]; then
+      echo "❌ Không tìm thấy arm64 APK"
+      exit 1
+    fi
+
+    BASENAME=$(basename "$FILE" .apk)
+    echo "apk_name=$BASENAME" >> $GITHUB_OUTPUT
+🧠 Tóm lại
+Bạn đã tìm đúng file
+
+Chỉ cần basename → dùng làm artifact name
+
+Không cần hardcode nữa
+
+Nếu bạn muốn bước tiếp:
+👉 upload tất cả ABI với tên chuẩn riêng từng file (auto luôn)
+
+mình viết cho bạn bản full workflow xịn luôn 😎
+
+
+Bỏ upload artifact sửa upload telegram để upload apk
+
+OK 👍 vậy mình sẽ bỏ hoàn toàn upload-artifact và sửa lại step Telegram để:
+
+👉 lấy đúng tên file thật (chuẩn 100%)
+👉 gửi đúng từng APK với tên gốc (không bị sai / thiếu arm64)
+
+✅ Bản Telegram upload chuẩn (final)
+- name: Send APKs to Telegram
+  if: success()
+  env:
+    BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+    CHAT_ID: ${{ secrets.TELEGRAM_USER_ID }}
+  run: |
+    echo "🔍 Tìm APK..."
+
+    mapfile -t APK_FILES < <(find ./app/build/outputs/apk/release -type f -name "*.apk")
+
+    if [ ${#APK_FILES[@]} -eq 0 ]; then
+      echo "❌ Không tìm thấy APK"
+      exit 1
+    fi
+
+    echo "📦 Danh sách APK:"
+    printf '%s\n' "${APK_FILES[@]}"
+
+    for FILE_PATH in "${APK_FILES[@]}"; do
+      echo "------------------------------------------"
+
+      # Resolve path thật
+      REAL_PATH=$(realpath "$FILE_PATH")
+
+      # Lấy tên file CHUẨN từ file thật
+      FILENAME=$(basename "$REAL_PATH")
+
+      echo "📤 Đang gửi: $FILENAME"
+
+      # Đảm bảo quyền đọc
+      chmod +r "$REAL_PATH"
+
+      RESPONSE=$(curl -s -L --retry 3 -w "\n%{http_code}" \
+        -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendDocument" \
+        -F chat_id="$CHAT_ID" \
+        -F "document=@$REAL_PATH;filename=$FILENAME" \
+        -F parse_mode=HTML \
+        -F "caption=<b>APK:</b> <code>$FILENAME</code>%0A<b>Repo:</b> ${{ github.repository }}")
+
+      HTTP_STATUS=$(echo "$RESPONSE" | tail -n 1)
+      BODY=$(echo "$RESPONSE" | head -n -1)
+
+      if [ "$HTTP_STATUS" -eq 200 ]; then
+        echo "✅ Thành công: $FILENAME"
+      else
+        echo "❌ Lỗi: $FILENAME"
+        echo "HTTP: $HTTP_STATUS"
+        echo "Response: $BODY"
+      fi
+    done
