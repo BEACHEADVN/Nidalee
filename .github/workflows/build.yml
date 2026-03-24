@@ -163,38 +163,33 @@ jobs:
           echo "tên file apk"
           echo $APK_FILE
 
-      - name: Rename APK (remove github-release)
+      - name: Rename APK and Get Info
         id: rename
         run: |
+          # Xử lý file APK
           APK_FILE=$(find ./app/build/outputs/apk/release -name "*.apk" | head -n 1)
           NEW_NAME=$(basename "$APK_FILE" | sed 's/-github-release//')
           NEW_PATH="./app/build/outputs/apk/release/$NEW_NAME"
-          
           mv "$APK_FILE" "$NEW_PATH"
           
-          # Đẩy các giá trị ra output của step 'rename'
+          # Đẩy Output APK
           echo "apk_path=$NEW_PATH" >> $GITHUB_OUTPUT
           echo "apk_name=$NEW_NAME" >> $GITHUB_OUTPUT
 
-          # Lấy tên branch/tag và xử lý
+          # Xử lý Version
           RAW_REF="${{ github.ref_name }}"
           CLEAN_VERSION="${RAW_REF#github-releases/}"
           echo "file_name=$CLEAN_VERSION" >> $GITHUB_OUTPUT
-          
-          echo "TÊN VERSION: $CLEAN_VERSION"
 
-          # 3. Lấy thông tin Commit (Sửa lỗi "Không lấy được commit")
+          # Xử lý Git Info
           SHORT_SHA=$(git rev-parse --short HEAD)
-          COMMIT_MSG=$(git log -1 --pretty=format:'%s')
+          # Escape ký tự đặc biệt để an toàn cho HTML Telegram
+          RAW_MSG=$(git log -1 --pretty=format:'%s')
+          SAFE_MSG=$(echo "$RAW_MSG" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')
           
           echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
-          echo "msg=$COMMIT_MSG" >> $GITHUB_OUTPUT
-          
-          # Log kiểm tra trong Actions console
-          echo "Version: $CLEAN_VERSION"
-          echo "Commit: $SHORT_SHA"
-          echo "Message: $COMMIT_MSG"
-  
+          echo "msg=$SAFE_MSG" >> $GITHUB_OUTPUT
+
       - name: Upload to Telegram
         uses: xireiki/channel-post@v1
         with:
@@ -204,11 +199,12 @@ jobs:
           method: sendDocument
           api_server_file_name: ${{ steps.rename.outputs.apk_name }}
           parse_mode: HTML
+          # Quan trọng: Gọi đúng steps.rename.outputs
           context: |
             <b>Version:</b> <code>${{ steps.rename.outputs.file_name }}</code>
             <b>Repository:</b> <a href="https://github.com/${{ github.repository }}">${{ github.repository }}</a>
             <b>Branch:</b> <a href="https://github.com/${{ github.repository }}/tree/${{ github.ref_name }}">${{ github.ref_name }}</a>
-            <b>Commit:</b> <a href="https://github.com/${{ github.repository }}/commit/${{ github.sha }}">${{ steps.commit_info.outputs.short_sha }}</a>
+            <b>Commit:</b> <a href="https://github.com/${{ github.repository }}/commit/${{ github.sha }}">${{ steps.rename.outputs.short_sha }}</a>
             <b>Workflow:</b> <a href="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}">View Run</a>
             <b>Commit Message:</b>
-            <code>${{ steps.commit_info.outputs.msg }}</code>
+            <code>${{ steps.rename.outputs.msg }}</code>
