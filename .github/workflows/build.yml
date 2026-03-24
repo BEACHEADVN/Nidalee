@@ -122,49 +122,40 @@ jobs:
           parse_mode: HTML
           method: sendMessage
           
-      - name: Send arm64-v8a APK to Telegram
-        if: success()
-        run: |
-          set -e
-  
-          # Tìm file
-          FILE=$(find ./app/build/outputs/apk/release -type f -name "*arm64-v8a.apk" | head -n 1)
-          
-          if [ -z "$FILE" ]; then
-            echo "❌ Không tìm thấy APK"
-            exit 1
-          fi
-        
-          # Đảm bảo file đã được ghi xong vào disk
-          sync
-          sleep 2
-        
-          NAME=$(basename "$FILE")
-          FULL_PATH=$(readlink -f "$FILE")
-          
-          echo "📤 Đang gửi: $NAME (Size: $(du -sh "$FULL_PATH" | cut -f1))"
-        
-          # Sử dụng biến cho Caption để tránh lỗi ký tự đặc biệt
-          CAPTION="<b>APK:</b> <code>${NAME}</code>"$'\n'"<b>Repo:</b> BEACHEADVN/Nidalee"
-        
-          # Thêm các cờ chống lỗi truyền tải (--retry, --connect-timeout)
-          RESPONSE=$(curl -s -w "\n%{http_code}" \
-            --retry 3 \
-            --retry-delay 5 \
-            --connect-timeout 10 \
-            -L -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendDocument" \
-            -F "chat_id=${CHAT_ID}" \
-            -F "document=@${FULL_PATH}" \
-            -F "parse_mode=HTML" \
-            -F "caption=${CAPTION}")
-        
-          HTTP_STATUS=$(echo "$RESPONSE" | tail -n 1)
-          BODY=$(echo "$RESPONSE" | head -n -1)
-        
-          if [ "$HTTP_STATUS" -ne 200 ]; then
-            echo "❌ Gửi Telegram thất bại! HTTP: $HTTP_STATUS"
-            echo "Chi tiết lỗi: $BODY"
-            exit 1
-          else
-            echo "✅ Gửi thành công!"
-          fi
+      - name: Send APK via Node.js
+      shell: node {0}
+      env:
+        BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+        CHAT_ID: ${{ secrets.CHAT_ID }}
+        FILE_PATH: ${{ env.FULL_PATH }} # Đảm bảo bạn đã set FULL_PATH ở bước trước
+        FILE_NAME: ${{ env.NAME }}
+      run: |
+        const fs = require('fs');
+        const https = require('https');
+        const FormData = require('form-data'); // Có sẵn trên runner
+
+        const form = new FormData();
+        form.append('chat_id', process.env.CHAT_ID);
+        form.append('document', fs.createReadStream(process.env.FILE_PATH), { filename: process.env.FILE_NAME });
+        form.append('parse_mode', 'HTML');
+        form.append('caption', `<b>APK:</b> <code>${process.env.FILE_NAME}</code>\n<b>Repo:</b> BEACHEADVN/Nidalee`);
+
+        const options = {
+          method: 'POST',
+          hostname: 'api.telegram.org',
+          path: `/bot${process.env.BOT_TOKEN}/sendDocument`,
+          headers: form.getHeaders(),
+        };
+
+        const req = https.request(options, (res) => {
+          console.log(`HTTP Status: ${res.statusCode}`);
+          res.on('data', (d) => process.stdout.write(d));
+          if (res.statusCode !== 200) process.exit(1);
+        });
+
+        req.on('error', (e) => {
+          console.error(e);
+          process.exit(1);
+        });
+
+        form.pipe(req);
