@@ -121,13 +121,7 @@ jobs:
             <b>Repository:</b> <a href="https://github.com/${{ github.repository }}">${{ github.repository }}</a>
           parse_mode: HTML
           method: sendMessage
-          
-      - name: Get APK path
-        id: apk
-        run: |
-          FILE=$(find ./app/build/outputs/apk/release -name "*.apk" | head -n 1)
-          echo "file=$FILE" >> $GITHUB_OUTPUT
-          
+  
       - name: Upload Kernel to Telegram
         if: success()
         uses: xireiki/channel-post@v1
@@ -145,5 +139,5 @@ jobs:
             <b>Commit Message:</b>
             <code>${{ steps.commit_info.outputs.msg }}</code>
           parse_mode: HTML
-          path: ${{ steps.apk.outputs.file }}
+          path: "./app/build/outputs/apk/release/termux-app_${{ env.APK_VERSION_TAG }}_arm64-v8a.apk"
           method: sendDocument
