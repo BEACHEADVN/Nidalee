@@ -126,38 +126,44 @@ jobs:
         if: success()
         run: |
           set -e
-      
-          BOT_TOKEN="${{ secrets.TELEGRAM_BOT_TOKEN }}"
-          CHAT_ID="${{ secrets.TELEGRAM_USER_ID }}"
-      
+  
+          # Tìm file
           FILE=$(find ./app/build/outputs/apk/release -type f -name "*arm64-v8a.apk" | head -n 1)
-      
+          
           if [ -z "$FILE" ]; then
             echo "❌ Không tìm thấy APK"
             exit 1
           fi
-      
+        
+          # Đảm bảo file đã được ghi xong vào disk
+          sync
+          sleep 2
+        
           NAME=$(basename "$FILE")
-          ls -lh "${FILE}"
-          # Đảm bảo đường dẫn file là tuyệt đối để tránh nhầm lẫn build directory
           FULL_PATH=$(readlink -f "$FILE")
+          
+          echo "📤 Đang gửi: $NAME (Size: $(du -sh "$FULL_PATH" | cut -f1))"
         
-          echo "📤 Đang gửi file: $NAME từ đường dẫn $FULL_PATH"
+          # Sử dụng biến cho Caption để tránh lỗi ký tự đặc biệt
+          CAPTION="<b>APK:</b> <code>${NAME}</code>"$'\n'"<b>Repo:</b> BEACHEADVN/Nidalee"
         
-          # Sử dụng dấu ngoặc kép cẩn thận cho các biến
-          RESPONSE=$(curl -s -w "\n%{http_code}" -L -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendDocument" \
+          # Thêm các cờ chống lỗi truyền tải (--retry, --connect-timeout)
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            --retry 3 \
+            --retry-delay 5 \
+            --connect-timeout 10 \
+            -L -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendDocument" \
             -F "chat_id=${CHAT_ID}" \
             -F "document=@${FULL_PATH}" \
             -F "parse_mode=HTML" \
-            -F "caption=<b>APK:</b> <code>${NAME}</code>%0ARepo: BEACHEADVN/Nidalee")
+            -F "caption=${CAPTION}")
         
-          # Tách lấy HTTP Code và nội dung phản hồi
           HTTP_STATUS=$(echo "$RESPONSE" | tail -n 1)
           BODY=$(echo "$RESPONSE" | head -n -1)
         
           if [ "$HTTP_STATUS" -ne 200 ]; then
-            echo "❌ Gửi Telegram thất bại! Mã lỗi HTTP: $HTTP_STATUS"
-            echo "Phản hồi từ API: $BODY"
+            echo "❌ Gửi Telegram thất bại! HTTP: $HTTP_STATUS"
+            echo "Chi tiết lỗi: $BODY"
             exit 1
           else
             echo "✅ Gửi thành công!"
