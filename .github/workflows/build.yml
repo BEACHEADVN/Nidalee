@@ -105,7 +105,7 @@ jobs:
 
          echo "🔍 Tìm file APK:"
          find . -type f -name "*.apk"
-         exit 1
+         #exit 1
 
          #echo "🔍 Tìm APK trong thư mục build (nếu có):"
          #find ./app/build/outputs/apk -type f -name "*.apk" 2>/dev/null || echo "Không có thư mục build"
