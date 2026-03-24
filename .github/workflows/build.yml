@@ -107,3 +107,19 @@ jobs:
             <b>Repository:</b> <a href="https://github.com/${{ github.repository }}">${{ github.repository }}</a>
           parse_mode: HTML
           method: sendMessage
+
+
+      - name: Send APK to Telegram
+        if: success()
+        uses: xireiki/channel-post@v1
+        with:
+          bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat_id: ${{ secrets.TELEGRAM_USER_ID }}
+          method: sendDocument
+          # Bạn chỉ nên gửi 1 file document chính (thường là APK)
+          document: ${{ env.APK_DIR_PATH }}/your_file_name_arm64-v8a.apk 
+          context: |
+            <b>Build Successful!</b>
+            <b>Repository:</b> ${{ github.repository }}
+            <b>Artifact:</b> arm64-v8a APK
+          parse_mode: HTML
