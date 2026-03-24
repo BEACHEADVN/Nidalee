@@ -130,6 +130,20 @@ jobs:
           echo "apk_name=$(basename $APK_FILE)" >> $GITHUB_OUTPUT
           echo "tên file apk"
           echo $APK_FILE
+
+      - name: Rename APK (remove github-release)
+        id: rename
+        run: |
+          APK_FILE=$(find ./app/build/outputs/apk/release -name "*.apk" | head -n 1)
+      
+          NEW_NAME=$(basename "$APK_FILE" | sed 's/-github-release//')
+      
+          NEW_PATH="./app/build/outputs/apk/release/$NEW_NAME"
+      
+          mv "$APK_FILE" "$NEW_PATH"
+      
+          echo "apk_path=$NEW_PATH" >> $GITHUB_OUTPUT
+          echo "apk_name=$NEW_NAME" >> $GITHUB_OUTPUT
   
       - name: Upload to Telegram
         uses: xireiki/channel-post@v1
