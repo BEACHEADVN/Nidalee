@@ -87,14 +87,6 @@ jobs:
             exit_on_error "sha256 failed"
           fi
 
-      - name: Attach arm64-v8a APK file
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.APK_BASENAME_PREFIX }}_arm64-v8a
-          path: |
-            ${{ env.APK_DIR_PATH }}/*arm64-v8a.apk
-            ${{ env.APK_DIR_PATH }}/output-metadata.json
-            
       - name: Debug workspace and find APK
         run: |
          echo "📂 Thư mục hiện tại:"
@@ -110,6 +102,14 @@ jobs:
          #echo "🔍 Tìm APK trong thư mục build (nếu có):"
          #find ./app/build/outputs/apk -type f -name "*.apk" 2>/dev/null || echo "Không có thư mục build"
 
+      - name: Attach arm64-v8a APK file
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APK_BASENAME_PREFIX }}_arm64-v8a
+          path: |
+            ${{ env.APK_DIR_PATH }}/*arm64-v8a.apk
+            ${{ env.APK_DIR_PATH }}/output-metadata.json
+            
       - name: Send Notification to Telegram
         if: success()
         uses: xireiki/channel-post@v1
