@@ -122,6 +122,12 @@ jobs:
           parse_mode: HTML
           method: sendMessage
           
+      - name: Get APK path
+        id: apk
+        run: |
+          FILE=$(find ./app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          echo "file=$FILE" >> $GITHUB_OUTPUT
+          
       - name: Upload Kernel to Telegram
         if: success()
         uses: xireiki/channel-post@v1
@@ -129,18 +135,15 @@ jobs:
           bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           chat_id: ${{ secrets.TELEGRAM_USER_ID }}
           context: |
-            
             <b>Version:</b> <code>${{ steps.extract.outputs.file_name }}</code>
             <b>Variant:</b> <code>${{ inputs.variant || 'Normal' }}</code>
             <b>Features:</b> <code>${{ inputs.feature_set }}</code>
-             <b>Repository:</b> <a href="https://github.com/${{ github.repository }}">${{ github.repository }}</a>
+            <b>Repository:</b> <a href="https://github.com/${{ github.repository }}">${{ github.repository }}</a>
             <b>Branch:</b> <a href="https://github.com/${{ github.repository }}/tree/${{ github.ref_name }}">${{ github.ref_name }}</a>
             <b>Commit:</b> <a href="https://github.com/${{ github.repository }}/commit/${{ github.sha }}">${{ steps.commit_info.outputs.short_sha }}</a>
             <b>Workflow:</b> <a href="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}">View Run</a>
             <b>Commit Message:</b>
             <code>${{ steps.commit_info.outputs.msg }}</code>
           parse_mode: HTML
-          # TRỎ THẲNG VÀO FILE TRONG THƯ MỤC ANYKERNEL3
-          # Dùng wildcard tên file để khớp với biến file_name của bạn
-          path: "./app/build/outputs/apk/release/*.apk"
-          method: sendFile
+          path: ${{ steps.apk.outputs.file }}
+          method: sendDocument
