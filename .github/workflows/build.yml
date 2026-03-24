@@ -182,6 +182,18 @@ jobs:
           echo "file_name=$CLEAN_VERSION" >> $GITHUB_OUTPUT
           
           echo "TÊN VERSION: $CLEAN_VERSION"
+
+          # 3. Lấy thông tin Commit (Sửa lỗi "Không lấy được commit")
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          COMMIT_MSG=$(git log -1 --pretty=format:'%s')
+          
+          echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
+          echo "msg=$COMMIT_MSG" >> $GITHUB_OUTPUT
+          
+          # Log kiểm tra trong Actions console
+          echo "Version: $CLEAN_VERSION"
+          echo "Commit: $SHORT_SHA"
+          echo "Message: $COMMIT_MSG"
   
       - name: Upload to Telegram
         uses: xireiki/channel-post@v1
