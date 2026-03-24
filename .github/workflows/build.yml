@@ -191,9 +191,7 @@ jobs:
           # Sử dụng 'context' thay vì 'caption'
           parse_mode: HTML
           context: |
-            <b>Version:</b> <code>${{ github.ref_name }}</code>
-            <b>Variant:</b> <code>${{ inputs.variant || 'Normal' }}</code>
-            <b>Features:</b> <code>${{ inputs.feature_set }}</code>
+            <b>Version:</b> <code>${{ replace(github.ref_name, 'github-releases/', '') }}</code>
             <b>Repository:</b> <a href="https://github.com/${{ github.repository }}">${{ github.repository }}</a>
             <b>Branch:</b> <a href="https://github.com/${{ github.repository }}/tree/${{ github.ref_name }}">${{ github.ref_name }}</a>
             <b>Commit:</b> <a href="https://github.com/${{ github.repository }}/commit/${{ github.sha }}">${{ steps.commit_info.outputs.short_sha }}</a>
