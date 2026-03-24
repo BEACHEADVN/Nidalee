@@ -30,10 +30,11 @@ jobs:
         if: success()
         uses: xireiki/channel-post@v1
         with:
-         bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-         chat_id: ${{ secrets.TELEGRAM_USER_ID }}
-         context: |
-          <b>Repository:</b> <a href="https://github.com/${{ github.repository }}">${{ github.repository }}</a>
+          bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat_id: ${{ secrets.TELEGRAM_USER_ID }}
+          # Ensure 'context' ends before the next key starts
+          context: |
+            <b>Repository:</b> <a href="https://github.com/${{ github.repository }}">${{ github.repository }}</a>
           parse_mode: HTML
           method: sendMessage
 
