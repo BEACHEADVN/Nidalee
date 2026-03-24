@@ -74,7 +74,7 @@ jobs:
           echo "•••VIJ TRÍ HIỆN TAIJ••••"
           pwd
           find . -name "*.apk"
-          exit 1
+          #exit 1
 
           echo "Validating APKs"
           for abi in arm64-v8a; do
@@ -111,18 +111,29 @@ jobs:
           parse_mode: HTML
           method: sendMessage
 
-
-      - name: Send APK to Telegram
+      - name: Send All APKs Separately to Telegram
         if: success()
-        uses: xireiki/channel-post@v1
-        with:
-          bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          chat_id: ${{ secrets.TELEGRAM_USER_ID }}
-          method: sendDocument
-          # Sử dụng wildcard '*' để bao quát cả dấu gạch ngang/gạch dưới và mã hash
-          path: ${{ env.APK_DIR_PATH }}/*arm64-v8a.apk
-          context: |
-            <b>Build Successful!</b>
-            <b>Repository:</b> ${{ github.repository }}
-            <b>Architecture:</b> arm64-v8a
-          parse_mode: HTML
+        env:
+          BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.TELEGRAM_USER_ID }}
+        run: |
+          # 1. Tìm tất cả file apk trong thư mục release
+          # Sử dụng 'find' để lấy danh sách đường dẫn đầy đủ
+          APK_FILES=$(find ./app/build/outputs/apk/release -name "*.apk" -type f)
+          
+          # 2. Duyệt qua từng file tìm được
+          for FILE_PATH in $APK_FILES; do
+            # Lấy tên file từ đường dẫn (ví dụ: arm64-v8a.apk)
+            FILENAME=$(basename "$FILE_PATH")
+            
+            echo "------------------------------------------"
+            echo "Đang gửi: $FILENAME"
+            
+            # 3. Sử dụng lệnh curl để gọi API Telegram gửi Document
+            curl -s -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendDocument" \
+              -F "chat_id=$CHAT_ID" \
+              -F "document=@$FILE_PATH" \
+              -F "parse_mode=HTML" \
+              -F "caption=<b>Artifact:</b> <code>$FILENAME</code>%0A<b>Repo:</b> ${{ github.repository }}" \
+              --fail || echo "Lỗi khi gửi file $FILENAME"
+          done
