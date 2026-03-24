@@ -139,10 +139,26 @@ jobs:
       
           NAME=$(basename "$FILE")
       
-          echo "📤 Gửi: $NAME"
-      
-          curl -s -L -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendDocument" \
-            -F chat_id="${CHAT_ID}" \
-            -F "document=@${FILE};filename=${NAME}" \
-            -F parse_mode=HTML \
-            -F "caption=<b>APK:</b> <code>${NAME}</code>%0A<b>Repo:</b> ${{ github.repository }}"
+          # Đảm bảo đường dẫn file là tuyệt đối để tránh nhầm lẫn build directory
+          FULL_PATH=$(readlink -f "$FILE")
+        
+          echo "📤 Đang gửi file: $NAME từ đường dẫn $FULL_PATH"
+        
+          # Sử dụng dấu ngoặc kép cẩn thận cho các biến
+          RESPONSE=$(curl -s -w "\n%{http_code}" -L -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendDocument" \
+            -F "chat_id=${CHAT_ID}" \
+            -F "document=@${FULL_PATH}" \
+            -F "parse_mode=HTML" \
+            -F "caption=<b>APK:</b> <code>${NAME}</code>%0ARepo: BEACHEADVN/Nidalee")
+        
+          # Tách lấy HTTP Code và nội dung phản hồi
+          HTTP_STATUS=$(echo "$RESPONSE" | tail -n 1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+        
+          if [ "$HTTP_STATUS" -ne 200 ]; then
+            echo "❌ Gửi Telegram thất bại! Mã lỗi HTTP: $HTTP_STATUS"
+            echo "Phản hồi từ API: $BODY"
+            exit 1
+          else
+            echo "✅ Gửi thành công!"
+          fi
