@@ -101,7 +101,7 @@ jobs:
          pwd
 
          echo "📁 Liệt kê toàn bộ file:"
-         ls -R
+         ls
 
          echo "🔍 Tìm file APK:"
          find . -type f -name "*.apk"
