@@ -111,39 +111,17 @@ jobs:
           parse_mode: HTML
           method: sendMessage
 
-      - name: Send All APKs Separately to Telegram
+      - name: Send APK to Telegram
         if: success()
-        env:
-          BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          CHAT_ID: ${{ secrets.TELEGRAM_USER_ID }}
-        run: |
-          # 1. Tìm tất cả file apk và lưu vào mảng an toàn
-          mapfile -t APK_FILES < <(find ./app/build/outputs/apk/release -name "*.apk" -type f)
-          
-          for FILE_PATH in "${APK_FILES[@]}"; do
-            FILENAME=$(basename "$FILE_PATH")
-            echo "------------------------------------------"
-            echo "Đang xử lý: $FILENAME"
-
-            # 2. Gửi file bằng curl với các cờ (flags) chịu lỗi tốt hơn
-            # -S: Hiển thị lỗi nhưng không hiện thanh tiến trình
-            # --retry 5: Thử lại 5 lần nếu gặp lỗi kết nối (Exit 26/56)
-            # --retry-delay 5: Đợi 5 giây giữa các lần thử lại
-            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
-              -X POST "https://api.telegram.org/bot$BOT_TOKEN/sendDocument" \
-              -F "chat_id=$CHAT_ID" \
-              -F "document=@$FILE_PATH" \
-              -F "parse_mode=HTML" \
-              -F "caption=<b>Artifact:</b> <code>$FILENAME</code>%0A<b>Repo:</b> ${{ github.repository }}" \
-              --retry 5 --retry-connrefused --retry-delay 5)
-
-            if [ "$HTTP_CODE" -eq 200 ]; then
-              echo "✅ Thành công: $FILENAME"
-            else
-              echo "❌ Thất bại: $FILENAME (Mã lỗi HTTP: $HTTP_CODE)"
-              # Không thoát (exit) ngay lập tức để tiếp tục thử file tiếp theo
-            fi
-            
-            # Nghỉ 2 giây để tránh bị Telegram giới hạn tần suất gửi (Flood limit)
-            sleep 2
-          done
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_USER_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          format: html
+          # Chú thích tin nhắn
+          message: |
+            <b>Build Successful!</b>
+            <b>Repository:</b> ${{ github.repository }}
+            <b>File:</b> <code>termux-app_arm64-v8a.apk</code>
+          # Tìm đúng file apk trong thư mục release
+          document: ${{ env.APK_DIR_PATH }}/*arm64-v8a.apk
