@@ -71,6 +71,8 @@ jobs:
           if ! ./gradlew assembleRelease; then
             exit_on_error "Build failed"
           fi
+          echo '•••VIJ TRÍ HIỆN TAIJ••••"
+          pwd
 
           echo "Validating APKs"
           for abi in arm64-v8a; do
@@ -94,7 +96,6 @@ jobs:
           path: |
             ${{ env.APK_DIR_PATH }}/*arm64-v8a.apk
             ${{ env.APK_DIR_PATH }}/output-metadata.json
-
 
       - name: Send Notification to Telegram
         if: success()
