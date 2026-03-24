@@ -116,10 +116,10 @@ jobs:
           bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           chat_id: ${{ secrets.TELEGRAM_USER_ID }}
           method: sendDocument
-          # Thay 'document' bằng 'path'
-          path: ${{ env.APK_DIR_PATH }}/${{ env.APK_BASENAME_PREFIX }}_arm64-v8a.apk
+          # Sử dụng wildcard '*' để bao quát cả dấu gạch ngang/gạch dưới và mã hash
+          path: ${{ env.APK_DIR_PATH }}/*arm64-v8a.apk
           context: |
             <b>Build Successful!</b>
             <b>Repository:</b> ${{ github.repository }}
-            <b>Artifact:</b> arm64-v8a APK
+            <b>Architecture:</b> arm64-v8a
           parse_mode: HTML
