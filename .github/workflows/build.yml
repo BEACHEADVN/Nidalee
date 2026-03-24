@@ -167,25 +167,21 @@ jobs:
         id: rename
         run: |
           APK_FILE=$(find ./app/build/outputs/apk/release -name "*.apk" | head -n 1)
-      
           NEW_NAME=$(basename "$APK_FILE" | sed 's/-github-release//')
-      
           NEW_PATH="./app/build/outputs/apk/release/$NEW_NAME"
-      
+          
           mv "$APK_FILE" "$NEW_PATH"
-      
+          
+          # Đẩy các giá trị ra output của step 'rename'
           echo "apk_path=$NEW_PATH" >> $GITHUB_OUTPUT
           echo "apk_name=$NEW_NAME" >> $GITHUB_OUTPUT
 
-          echo "tên file apk"
-          echo $APK_FILE
-          # Lấy tên branch/tag
+          # Lấy tên branch/tag và xử lý
           RAW_REF="${{ github.ref_name }}"
-          # Dùng shell để xóa phần 'github-releases/'
           CLEAN_VERSION="${RAW_REF#github-releases/}"
           echo "file_name=$CLEAN_VERSION" >> $GITHUB_OUTPUT
-          echo "TÊN VERSION"
-          echo $CLEAN_VERSION
+          
+          echo "TÊN VERSION: $CLEAN_VERSION"
   
       - name: Upload to Telegram
         uses: xireiki/channel-post@v1
@@ -195,10 +191,9 @@ jobs:
           path: ${{ steps.rename.outputs.apk_path }}
           method: sendDocument
           api_server_file_name: ${{ steps.rename.outputs.apk_name }}
-          # Sử dụng 'context' thay vì 'caption'
           parse_mode: HTML
           context: |
-            <b>Version:</b> <code>${{ steps.extract.outputs.file_name }}</code>
+            <b>Version:</b> <code>${{ steps.rename.outputs.file_name }}</code>
             <b>Repository:</b> <a href="https://github.com/${{ github.repository }}">${{ github.repository }}</a>
             <b>Branch:</b> <a href="https://github.com/${{ github.repository }}/tree/${{ github.ref_name }}">${{ github.ref_name }}</a>
             <b>Commit:</b> <a href="https://github.com/${{ github.repository }}/commit/${{ github.sha }}">${{ steps.commit_info.outputs.short_sha }}</a>
