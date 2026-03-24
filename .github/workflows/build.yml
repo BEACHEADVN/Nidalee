@@ -150,6 +150,6 @@ jobs:
         with:
           bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           chat_id: ${{ secrets.TELEGRAM_USER_ID }}
-          path: ${{ steps.apk.outputs.apk_path }}
+          path: ${{ steps.rename.outputs.apk_path }}
           method: sendDocument
-          api_server_file_name: ${{ steps.apk.outputs.apk_name }}
+          api_server_file_name: ${{ steps.rename.outputs.apk_name }}
