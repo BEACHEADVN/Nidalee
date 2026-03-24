@@ -106,3 +106,17 @@ jobs:
           <b>Repository:</b> <a href="https://github.com/${{ github.repository }}">${{ github.repository }}</a>
           parse_mode: HTML
           method: sendMessage
+
+
+      - name: Upload APK to Telegram
+        run: |
+         FILE=$(ls $APK_DIR_PATH/*arm64-v8a.apk | head -n 1)
+         NAME=$(basename "$FILE")
+         curl -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument" \
+         -F chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+         -F document=@"$FILE" \
+         -F caption="📦 $NAME
+         Commit: ${GITHUB_SHA:0:7}"
+
+         
+            
