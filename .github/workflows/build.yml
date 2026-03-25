@@ -206,6 +206,5 @@ jobs:
             <b>Branch:</b> <a href="https://github.com/${{ github.repository }}/tree/${{ github.ref_name }}">${{ github.ref_name }}</a>
             <b>Commit:</b> <a href="https://github.com/${{ github.repository }}/commit/${{ github.sha }}">${{ steps.rename.outputs.short_sha }}</a>
             <b>Workflow:</b> <a href="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}">View Run</a>
-            
             <b>Commit Message:</b>
             <a href="https://github.com/${{ github.repository }}/commit/${{ github.sha }}"><code>${{ steps.rename.outputs.msg }}</code></a>
