@@ -190,6 +190,16 @@ jobs:
           echo "short_sha=$SHORT_SHA" >> $GITHUB_OUTPUT
           echo "msg=$SAFE_MSG" >> $GITHUB_OUTPUT
 
+      - name: Send Notification to Telegram
+        uses: xireiki/channel-post@v1
+        with:
+          bot_token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          chat_id: ${{ secrets.TELEGRAM_USER_ID }}
+          context: |
+            https://github.com/BEACHEADVN/Nidalee
+          parse_mode: HTML
+          method: sendMessage
+
       - name: Upload to Telegram
         uses: xireiki/channel-post@v1
         with:
